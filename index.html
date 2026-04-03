@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cronograma de Aulas — Thaygo</title>
+
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #070708;
+      --panel: #121214;
+      --card: #17171a;
+      --border: #222227;
+      --text: #e9e9ef;
+      --muted: #888d94;
+      --accent: #e11d48;
+      --radius: 12px;
+      --shadow: 0 10px 30px rgba(0,0,0,.4);
+      --grid-hour-height: 48px; 
+    }
+
+    * { box-sizing: border-box; }
+    
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: "Ubuntu Mono", monospace;
+      background: var(--bg);
+      color: var(--text);
+      letter-spacing: 0.3px;
+    }
+
+    .wrap { max-width: 1350px; margin: 0 auto; }
+
+    header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 16px;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 28px; }
+    .sub { color: var(--muted); }
+    
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .controls-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      transition: border-color 0.3s;
+    }
+    .controls-panel.is-editing {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px rgba(225,29,72,0.1);
+    }
+
+    .input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 110px; }
+    .input-group label { font-size: 13px; color: var(--muted); }
+    
+    input, select {
+      background: #0b0b0c;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+    }
+    input:focus, select:focus { border-color: var(--muted); }
+    input[type="color"] { padding: 2px; height: 38px; cursor: pointer; }
+
+    button, .btn-label {
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+      height: 38px;
+      white-space: nowrap;
+      display: inline-flex; align-items: center; justify-content: center;
+      text-decoration: none; font-size: 13px;
+    }
+    button:hover, .btn-label:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255,255,255,0.1); }
+    
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { box-shadow: 0 4px 12px rgba(225,29,72,0.3); }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-ghost:hover { border-color: var(--text); background: rgba(255,255,255,0.05); }
+
+    .capture-area {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .capture-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 16px;
+    }
+    .capture-header h2 { margin: 0; font-size: 20px; }
+    .stats { font-size: 14px; color: var(--muted); background: #070708; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);}
+
+    .timetable {
+      display: flex; position: relative;
+      height: calc(16 * var(--grid-hour-height));
+    }
+
+    .time-axis { width: 60px; display: flex; flex-direction: column; border-right: 1px solid var(--border); padding-right: 10px; }
+    .time-label { height: var(--grid-hour-height); color: var(--muted); font-size: 13px; text-align: right; transform: translateY(-8px); }
+
+    .days-wrapper { display: flex; flex: 1; }
+    .day-col {
+      flex: 1; position: relative; border-right: 1px solid var(--border);
+      background-image: linear-gradient(var(--border) 1px, transparent 1px);
+      background-size: 100% var(--grid-hour-height);
+    }
+    .day-col:last-child { border-right: none; }
+
+    .day-header {
+      text-align: center; font-weight: bold; padding-bottom: 10px;
+      color: var(--muted); position: absolute; top: -30px; width: 100%;
+    }
+
+    .class-card {
+      position: absolute; left: 4px; right: 4px; border-radius: 8px; padding: 8px 10px;
+      color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); overflow: hidden;
+      display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s;
+      border-left: 4px solid rgba(255,255,255,0.3); cursor: pointer;
+    }
+    .class-card:hover { transform: scale(1.02); z-index: 10; }
+    .class-card.is-editing { box-shadow: 0 0 0 2px #fff, 0 10px 30px rgba(0,0,0,0.5); z-index: 11; opacity: 0.9; }
+    
+    .class-title { font-weight: bold; font-size: 15px; margin-bottom: 4px; line-height: 1.1; pointer-events: none;}
+    .class-time { font-size: 12px; opacity: 0.9; margin-bottom: 6px; font-weight: bold; pointer-events: none;}
+    .class-details { display: flex; flex-direction: column; gap: 3px; font-weight: bold; font-size: 14px; opacity: 0.85; margin-top: auto; pointer-events: none;}
+    .detail-item { display: flex; align-items: center; gap: 4px; }
+
+    .delete-btn {
+      position: absolute; top: 4px; right: 4px;
+      background: rgba(0,0,0,0.4); color: white; border: none;
+      width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 10px;
+      opacity: 0; transition: opacity 0.2s; padding: 0;
+    }
+    .class-card:hover .delete-btn { opacity: 1; }
+
+  </style>
+</head>
+<body>
+
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Grade Horária</h1>
+        <div class="sub">Organize, edite e exporte sua rotina de estudos.</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-ghost" onclick="downloadImage()">Baixar PNG</button>
+        <button class="btn-ghost" onclick="exportJSON()">Exportar JSON</button>
+        <label class="btn-label btn-ghost" for="importFile">Importar JSON</label>
+        <input type="file" id="importFile" accept=".json" hidden onchange="importJSON(event)">
+      </div>
+    </header>
+
+    <div class="controls-panel" id="controlsPanel">
+      <div class="input-group" style="flex: 2;">
+        <label>Matéria</label>
+        <input type="text" id="subjectName" placeholder="Ex: Front-end">
+      </div>
+      <div class="input-group" style="flex: 1.5;">
+        <label>Professor(a)</label>
+        <input type="text" id="subjectProf" placeholder="Ex: João">
+      </div>
+      <div class="input-group" style="flex: 1.5;">
+        <label>Sala/Local</label>
+        <input type="text" id="subjectRoom" placeholder="Ex: Lab 1">
+      </div>
+      <div class="input-group">
+        <label>Dia</label>
+        <select id="dayOfWeek">
+          <option value="1">Segunda</option>
+          <option value="2">Terça</option>
+          <option value="3">Quarta</option>
+          <option value="4">Quinta</option>
+          <option value="5">Sexta</option>
+        </select>
+      </div>
+      <div class="input-group" style="min-width: 80px;">
+        <label>Início</label>
+        <input type="time" id="startTime" value="08:00">
+      </div>
+      <div class="input-group" style="min-width: 80px;">
+        <label>Fim</label>
+        <input type="time" id="endTime" value="12:00">
+      </div>
+      <div class="input-group" style="min-width: 50px; flex: 0.5;">
+        <label>Cor</label>
+        <input type="color" id="subjectColor" value="#e11d48">
+      </div>
+      <button class="btn-primary" id="mainActionBtn" onclick="saveClass()">+ Adicionar</button>
+      <button class="btn-ghost" id="cancelEditBtn" style="display: none;" onclick="cancelEdit()">Cancelar</button>
+    </div>
+
+    <div class="capture-area" id="timetable-capture">
+      <div class="capture-header">
+        <h2>Minha Semana</h2>
+        <div class="stats" id="weeklyStats">Carga Horária: 0h</div>
+      </div>
+      <div class="timetable">
+        <div class="time-axis" id="timeAxis"></div>
+        <div class="days-wrapper">
+          <div class="day-col" id="day-1"><div class="day-header">SEGUNDA</div></div>
+          <div class="day-col" id="day-2"><div class="day-header">TERÇA</div></div>
+          <div class="day-col" id="day-3"><div class="day-header">QUARTA</div></div>
+          <div class="day-col" id="day-4"><div class="day-header">QUINTA</div></div>
+          <div class="day-col" id="day-5"><div class="day-header">SEXTA</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const START_HOUR = 7; 
+  let classes = JSON.parse(localStorage.getItem('thaygo.schedule.v3')) || [];
+  let editingIndex = null; // Controla qual card estamos editando
+
+  function renderTimeAxis() {
+    const timeAxis = document.getElementById("timeAxis");
+    timeAxis.innerHTML = "";
+    for (let i = START_HOUR; i <= 23; i++) {
+      const label = document.createElement("div");
+      label.className = "time-label";
+      label.textContent = `${i.toString().padStart(2, '0')}:00`;
+      timeAxis.appendChild(label);
+    }
+  }
+
+  function timeToMinutes(timeStr) {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return ((hours - START_HOUR) * 60) + minutes;
+  }
+
+  // Verifica conflitos ignorando a aula que está sendo editada no momento
+  function hasConflict(newDay, newStartMin, newEndMin, ignoreIndex = null) {
+    return classes.some((cls, index) => {
+      if (index === ignoreIndex) return false; 
+      if (cls.day !== newDay) return false;
+      const existStart = timeToMinutes(cls.start);
+      const existEnd = timeToMinutes(cls.end);
+      return (newStartMin < existEnd && newEndMin > existStart);
+    });
+  }
+
+  function renderClasses() {
+    for (let i = 1; i <= 5; i++) {
+      const col = document.getElementById(`day-${i}`);
+      const header = col.querySelector('.day-header');
+      col.innerHTML = '';
+      col.appendChild(header); 
+    }
+
+    let totalMinutesWeek = 0;
+
+    classes.forEach((cls, index) => {
+      const startMin = timeToMinutes(cls.start);
+      const endMin = timeToMinutes(cls.end);
+      const duration = endMin - startMin;
+      totalMinutesWeek += duration;
+
+      const card = document.createElement('div');
+      card.className = 'class-card';
+      if (editingIndex === index) card.classList.add('is-editing');
+      
+      const scaleY = 48 / 60;
+      card.style.top = `${startMin * scaleY}px`;
+      card.style.height = `${duration * scaleY}px`;
+      card.style.backgroundColor = cls.color;
+
+      // Chama a função de edição ao clicar no card
+      card.onclick = () => editClass(index);
+
+      let detailsHTML = '';
+      if(cls.prof || cls.room) {
+        detailsHTML = `<div class="class-details">`;
+        if(cls.prof) detailsHTML += `<div class="detail-item"> PROFESSOR: ${escapeHtml(cls.prof)}</div>`;
+        if(cls.room) detailsHTML += `<div class="detail-item"> SALA: ${escapeHtml(cls.room)}</div>`;
+        detailsHTML += `</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="class-title">${escapeHtml(cls.name)}</div>
+        <div class="class-time">${cls.start} - ${cls.end}</div>
+        ${detailsHTML}
+        <button class="delete-btn" title="Remover" onclick="removeClass(${index}, event)">X</button>
+      `;
+
+      document.getElementById(`day-${cls.day}`).appendChild(card);
+    });
+
+    const hours = Math.floor(totalMinutesWeek / 60);
+    const mins = totalMinutesWeek % 60;
+    document.getElementById('weeklyStats').textContent = `Carga Horária: ${hours}h ${mins > 0 ? mins + 'm' : ''}`;
+
+    localStorage.setItem('thaygo.schedule.v3', JSON.stringify(classes));
+  }
+
+  function saveClass() {
+    const name = document.getElementById('subjectName').value.trim();
+    const prof = document.getElementById('subjectProf').value.trim();
+    const room = document.getElementById('subjectRoom').value.trim();
+    const day = document.getElementById('dayOfWeek').value;
+    const start = document.getElementById('startTime').value;
+    const end = document.getElementById('endTime').value;
+    const color = document.getElementById('subjectColor').value;
+
+    if (!name || !start || !end) {
+      alert("⚠️ Preencha pelo menos o nome da matéria e os horários.");
+      return;
+    }
+
+    const startMin = timeToMinutes(start);
+    const endMin = timeToMinutes(end);
+
+    if (endMin <= startMin) {
+      alert("⚠️ O horário de fim deve ser depois do horário de início.");
+      return;
+    }
+
+    if (hasConflict(day, startMin, endMin, editingIndex)) {
+      alert("⚠️ Conflito de horário! Você já tem uma aula neste período.");
+      return;
+    }
+
+    const classData = { name, prof, room, day, start, end, color };
+
+    if (editingIndex !== null) {
+      classes[editingIndex] = classData;
+    } else {
+      classes.push(classData);
+    }
+    
+    cancelEdit(); // Reseta o form e re-renderiza
+  }
+
+  // Preenche os campos com os dados da aula clicada e muda para modo de edição
+  function editClass(index) {
+    editingIndex = index;
+    const cls = classes[index];
+    
+    document.getElementById('subjectName').value = cls.name;
+    document.getElementById('subjectProf').value = cls.prof || '';
+    document.getElementById('subjectRoom').value = cls.room || '';
+    document.getElementById('dayOfWeek').value = cls.day;
+    document.getElementById('startTime').value = cls.start;
+    document.getElementById('endTime').value = cls.end;
+    document.getElementById('subjectColor').value = cls.color;
+
+    document.getElementById('mainActionBtn').textContent = '💾 Salvar Edição';
+    document.getElementById('cancelEditBtn').style.display = 'inline-flex';
+    document.getElementById('controlsPanel').classList.add('is-editing');
+    
+    renderClasses(); // Re-renderiza para destacar o card
+  }
+
+  // Cancela a edição e limpa os campos
+  function cancelEdit() {
+    editingIndex = null;
+    document.getElementById('subjectName').value = ''; 
+    document.getElementById('subjectProf').value = ''; 
+    document.getElementById('subjectRoom').value = ''; 
+    
+    document.getElementById('mainActionBtn').textContent = '+ Adicionar';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    document.getElementById('controlsPanel').classList.remove('is-editing');
+    
+    renderClasses();
+  }
+
+  function removeClass(index, event) {
+    event.stopPropagation();
+    if(editingIndex === index) cancelEdit(); // Se deletar o que tá editando, cancela a edição
+    classes.splice(index, 1);
+    renderClasses();
+  }
+
+  function escapeHtml(s="") { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  // IMPORTAR / EXPORTAR JSON
+  function exportJSON() {
+    const dataStr = JSON.stringify(classes, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cronograma-backup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        if (Array.isArray(importedData)) {
+          classes = importedData;
+          cancelEdit();
+          alert("Deu Bom: Cronograma importado com sucesso!");
+        } else {
+          alert("Deu bom não coleguinha: Arquivo JSON inválido. Certifique-se de que é um backup do cronograma.");
+        }
+      } catch (err) {
+        alert("Deu ruim: Deu Erro ao ler o arquivo JSON.");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reseta o input de arquivo
+  }
+
+  function downloadImage() {
+    const captureArea = document.getElementById('timetable-capture');
+    document.querySelectorAll('.delete-btn').forEach(btn => btn.style.display = 'none');
+    // Remove o destaque de edição para a foto ficar limpa
+    if(editingIndex !== null) document.querySelectorAll('.class-card')[editingIndex].classList.remove('is-editing');
+
+    html2canvas(captureArea, { backgroundColor: '#121214', scale: 2 }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'cronograma-aulas-thaygo.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      
+      document.querySelectorAll('.delete-btn').forEach(btn => btn.style.display = 'flex');
+      if(editingIndex !== null) renderClasses(); // Devolve o destaque
+    });
+  }
+
+  renderTimeAxis();
+  renderClasses();
+</script>
+</body>
+</html>
